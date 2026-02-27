@@ -1,6 +1,7 @@
+// cart.js
 let cart = [];
-// let  orderId;
 console.log("cart.js loaded");
+
 const products = [
     { name: "20L Washing Powder", price: 350, image: "img/bucketflower.webp" },
     { name: "5L Washing Powder", price: 95, image: "img/5Lpowder.webp" },
@@ -13,27 +14,27 @@ const products = [
 document.addEventListener("DOMContentLoaded", function () {
     const productList = document.getElementById("product-list");
 
-    // Render products
-if (productList) {
-    products.forEach((product, index) => {
-        productList.innerHTML += `
-        <div class="col-lg-4 col-md-6">
-            <div class="store-item position-relative text-center">
-                <img class="img-fluid" src="${product.image}" alt="">
-                <div class="p-4">
-                    <h4 class="mb-3">${product.name}</h4>
-                    <h4 class="text-primary">R${product.price}.00</h4>
-                </div>
-                <div class="store-overlay">
-                    <button class="btn btn-dark rounded-pill py-2 px-4 m-2 add-to-cart" data-index="${index}">
-                        Add to Cart <i class="fa fa-cart-plus ms-2"></i>
-                    </button>
+    // Render products if container exists
+    if (productList) {
+        products.forEach((product, index) => {
+            productList.innerHTML += `
+            <div class="col-lg-4 col-md-6">
+                <div class="store-item position-relative text-center">
+                    <img class="img-fluid" src="${product.image}" alt="">
+                    <div class="p-4">
+                        <h4 class="mb-3">${product.name}</h4>
+                        <h4 class="text-primary">R${product.price}.00</h4>
+                    </div>
+                    <div class="store-overlay">
+                        <button class="btn btn-dark rounded-pill py-2 px-4 m-2 add-to-cart" data-index="${index}">
+                            Add to Cart <i class="fa fa-cart-plus ms-2"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
-        </div>
-        `;
-    });
-}
+            `;
+        });
+    }
 
     // Cart button listeners
     document.querySelectorAll('.add-to-cart').forEach(button => {
@@ -44,17 +45,22 @@ if (productList) {
         });
     });
 
-    // Checkout form
-    document.getElementById("checkout-form").addEventListener("submit", function (e) {
-        e.preventDefault();
-        checkout();
-    });
+    // Checkout form listener (if form exists on this page)
+    const checkoutForm = document.getElementById("checkout-form");
+    if (checkoutForm) {
+        checkoutForm.addEventListener("submit", function (e) {
+            e.preventDefault();
+            checkout();
+        });
+    }
 });
 
 function updateCart() {
     const cartItems = document.getElementById('cart-items');
     const cartCount = document.getElementById('cart-count');
     const cartTotal = document.getElementById('cart-total');
+
+    if (!cartItems || !cartCount || !cartTotal) return;
 
     cartItems.innerHTML = "";
     let total = 0;
@@ -84,17 +90,25 @@ function openCheckout() {
         return;
     }
 
-    // Close cart modal
-    const cartModal = bootstrap.Modal.getInstance(
-        document.getElementById("cartModal")
-    );
-    cartModal.hide();
+    // Close cart modal if exists
+    const cartModalEl = document.getElementById("cartModal");
+    if (cartModalEl) {
+        const cartModal = bootstrap.Modal.getInstance(cartModalEl);
+        if (cartModal) cartModal.hide();
+    }
 
-    // Open checkout modal
-    const checkoutModal = new bootstrap.Modal(
-        document.getElementById("checkoutModal")
-    );
-    checkoutModal.show();
+    // Open checkout modal if exists
+    const checkoutModalEl = document.getElementById("checkoutModal");
+    if (checkoutModalEl) {
+        const checkoutModal = new bootstrap.Modal(checkoutModalEl);
+        checkoutModal.show();
+
+        // Focus first input
+        checkoutModalEl.addEventListener('shown.bs.modal', () => {
+            const firstInput = document.getElementById("customer-name");
+            if (firstInput) firstInput.focus();
+        }, { once: true });
+    }
 }
 
 function checkout() {
@@ -103,25 +117,24 @@ function checkout() {
         return;
     }
 
-    const name = document.getElementById("customer-name").value;
-    const phone = document.getElementById("customer-phone").value;
-    const address = document.getElementById("customer-address").value;
+    const name = document.getElementById("customer-name")?.value || "";
+    const phone = document.getElementById("customer-phone")?.value || "";
+    const address = document.getElementById("customer-address")?.value || "";
 
-        // Generate orderId here
-    const orderId = "ORDER-" + Date.now();
     if (!name || !phone || !address) {
         alert("Please fill in your personal details.");
         return;
     }
 
+    // Generate orderId
+    const orderId = "ORDER-" + Date.now();
 
-
-    // Store orderId + cart + customer info
-    localStorage.setItem("orderId", orderId); // now orderId exists
-    sessionStorage.setItem("cart", JSON.stringify(cart));
-    sessionStorage.setItem("customerName", name);
-    sessionStorage.setItem("customerPhone", phone);
-    sessionStorage.setItem("customerAddress", address);
+    // Store cart and customer info in localStorage (persists across pages)
+    localStorage.setItem("orderId", orderId);
+    localStorage.setItem("cart", JSON.stringify(cart));
+    localStorage.setItem("customerName", name);
+    localStorage.setItem("customerPhone", phone);
+    localStorage.setItem("customerAddress", address);
 
     // Calculate total and item names
     let total = 0;
@@ -134,14 +147,11 @@ function checkout() {
     // PayFast form
     const form = document.createElement("form");
     form.method = "POST";
-    form.action = "https://sandbox.payfast.co.za/eng/process";
-
-    const merchantId = "10000100"; // sandbox ID
-    const merchantKey = "46f0cd694581a"; // sandbox key
+    form.action = "https://sandbox.payfast.co.za/eng/process"; // sandbox URL
 
     const inputs = {
-        merchant_id: merchantId,
-        merchant_key: merchantKey,
+        merchant_id: "10000100", // sandbox ID
+        merchant_key: "46f0cd694581a", // sandbox key
         m_payment_id: orderId,
         return_url: "https://products.fshsystems.co.za/success.html",
         cancel_url: "https://products.fshsystems.co.za/cancel.html",
@@ -153,7 +163,6 @@ function checkout() {
         custom_str3: address,
         custom_str4: String(itemNames),
         custom_str5: String(total.toFixed(2))
-        
     };
 
     for (const key in inputs) {
@@ -168,51 +177,37 @@ function checkout() {
     form.submit();
 }
 
-
-// Send the details on Whatsapp after successful payment
-// Prepare WhatsApp link on success page
+// WhatsApp link on success page
 document.addEventListener("DOMContentLoaded", function () {
-
     if (!window.location.pathname.includes("success.html")) return;
 
     const whatsappLink = document.getElementById("whatsappLink");
-    if (!whatsappLink) {
-        console.error("WhatsApp button not found");
-        return;
-    }
+    if (!whatsappLink) return;
 
-    const cart = JSON.parse(sessionStorage.getItem("cart") || "[]");
-    const name = sessionStorage.getItem("customerName") || "";
-    const phone = sessionStorage.getItem("customerPhone") || "";
-    const address = sessionStorage.getItem("customerAddress") || "";
-
-    if (!cart.length) {
-        console.error("Cart is empty on success page");
-        return;
-    }
-    // Get the order ID from localStorage
+    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    const name = localStorage.getItem("customerName") || "";
+    const phone = localStorage.getItem("customerPhone") || "";
+    const address = localStorage.getItem("customerAddress") || "";
     const orderId = localStorage.getItem("orderId") || "N/A";
 
-    let message = `Hello, my name is ${name}. I am confirming my order:%0A%0A`;
-    let total = 0;
+    if (!cart.length) return;
 
+    let total = 0;
+    let message = `Hello, my name is ${name}. I am confirming my order:%0A%0A`;
     cart.forEach(item => {
         message += `• ${item.name} - R${item.price}%0A`;
         total += item.price;
     });
-
     message += `%0ATotal: R${total}%0A`;
     message += `Order ID: ${orderId}%0A`;
     message += `Phone: ${phone}%0A`;
     message += `Address: ${address}%0A`;
-        message += `%0A`;
-    message += `Please don't forget to share your proof of payment as well.%0A`;
-
+    message += `%0APlease don't forget to share your proof of payment as well.%0A`;
 
     whatsappLink.href = `https://wa.me/27604564022?text=${message}`;
 
     whatsappLink.addEventListener("click", () => {
-        sessionStorage.clear();
+        localStorage.clear();
     });
 
     console.log("WhatsApp link ready:", whatsappLink.href);

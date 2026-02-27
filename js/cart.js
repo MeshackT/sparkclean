@@ -98,73 +98,61 @@ function openCheckout() {
 }
 
 function checkout() {
-    if (cart.length === 0) {
-        alert("Your cart is empty.");
-        return;
-    }
+    if (cart.length === 0) return alert("Your cart is empty.");
 
     const name = document.getElementById("customer-name").value;
     const phone = document.getElementById("customer-phone").value;
     const address = document.getElementById("customer-address").value;
 
-        // Generate orderId here
+    if (!name || !phone || !address) return alert("Please fill in your personal details.");
+
     const orderId = "ORDER-" + Date.now();
-    if (!name || !phone || !address) {
-        alert("Please fill in your personal details.");
-        return;
-    }
 
+    // Close checkout modal first
+    const checkoutModalEl = document.getElementById("checkoutModal");
+    const checkoutModalInstance = bootstrap.Modal.getInstance(checkoutModalEl);
+    if (checkoutModalInstance) checkoutModalInstance.hide();
 
+    // Wait until modal is fully hidden, then submit form
+    checkoutModalEl.addEventListener('hidden.bs.modal', () => {
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = "https://sandbox.payfast.co.za/eng/process";
 
-    // Store orderId + cart + customer info
-    localStorage.setItem("orderId", orderId); // now orderId exists
-    sessionStorage.setItem("cart", JSON.stringify(cart));
-    sessionStorage.setItem("customerName", name);
-    sessionStorage.setItem("customerPhone", phone);
-    sessionStorage.setItem("customerAddress", address);
+        const merchantId = "10000100";
+        const merchantKey = "46f0cd694581a";
 
-    // Calculate total and item names
-    let total = 0;
-    let itemNames = "";
-    cart.forEach(item => {
-        total += item.price;
-        itemNames += item.name + ", ";
-    });
+        const total = cart.reduce((sum, item) => sum + item.price, 0);
+        const itemNames = cart.map(i => i.name).join(", ");
 
-    // PayFast form
-    fetch("https://your-backend.onrender.com/create-payment", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-        orderId,
-        amount: total.toFixed(2),
-        item_name: itemNames,
-        customer: {
-        name,
-        phone,
-        address
+        const inputs = {
+            merchant_id: merchantId,
+            merchant_key: merchantKey,
+            m_payment_id: orderId,
+            return_url: "https://products.fshsystems.co.za/success.html",
+            cancel_url: "https://products.fshsystems.co.za/cancel.html",
+            notify_url: "https://products.fshsystems.co.za/ipn.php",
+            amount: total.toFixed(2),
+            item_name: itemNames + " Order by " + name,
+            custom_str1: name,
+            custom_str2: phone,
+            custom_str3: address,
+            custom_str4: itemNames,
+            custom_str5: total.toFixed(2)
+        };
+
+        for (const key in inputs) {
+            const input = document.createElement("input");
+            input.type = "hidden";
+            input.name = key;
+            input.value = inputs[key];
+            form.appendChild(input);
         }
-    })
-    })
-    .then(res => res.json())
-    .then(({ payfast_url, fields }) => {
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = payfast_url;
 
-    Object.entries(fields).forEach(([key, value]) => {
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = key;
-        input.value = value;
-        form.appendChild(input);
-    });
-
-    document.body.appendChild(form);
-    form.submit();
-    });
+        document.body.appendChild(form);
+        form.submit();
+    }, { once: true });
 }
-
 
 // Send the details on Whatsapp after successful payment
 // Prepare WhatsApp link on success page
